@@ -366,15 +366,12 @@ def parse_querystr(querystr, coll):
 @app.route("/reports/<coll>/<interval>/<num_intervals>/fig.png")
 def simple(coll, interval, num_intervals):
     from io import BytesIO
-
-    from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-
     fwr = FWReport(app.lp)
     fig = fwr.plot_stats(coll, interval, int(num_intervals))
-
-    canvas = FigureCanvas(fig)
-    png_output = BytesIO()
-    canvas.print_png(png_output)
+    
+    # Convert Plotly figure to PNG bytes
+    png_output = BytesIO(fig.to_image(format="png"))
+    
     response = make_response(png_output.getvalue())
     response.headers["Content-Type"] = "image/png"
     return response

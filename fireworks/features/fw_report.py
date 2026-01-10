@@ -131,7 +131,6 @@ class FWReport:
 
     def plot_stats(self, coll="fireworks", interval="days", num_intervals=5, states=None, style="bar", **kwargs):
         """Makes a chart with the summary data.
-
         Args:
             coll (str): collection, either "fireworks", "workflows", or "launches"
             interval (str): one of "minutes", "hours", "days", "months", "years"
@@ -139,44 +138,58 @@ class FWReport:
             states ([str]): states to include in plot, defaults to all states,
                 note this also specifies the order of stacking
             style (str): style of plot to generate, can either be 'bar' or 'fill'
-
         Returns:
-            matplotlib plot module
+            plotly Figure object
         """
         results = self.get_stats(coll, interval, num_intervals, **kwargs)
         states = states or [*state_to_color]
-
-        from matplotlib.figure import Figure
-        from matplotlib.ticker import MaxNLocator
-
-        fig = Figure()
-        ax = fig.add_subplot(111)
+        
+        import plotly.graph_objects as go
+        
         data = {state: [result["states"][state] for result in results] for state in states}
-
-        bottom = [0] * len(results)
+        x_values = list(range(num_intervals))
+        
+        traces = []
         for state in states:
             if any(data[state]):
                 if style == "bar":
-                    ax.bar(range(len(bottom)), data[state], bottom=bottom, color=state_to_color[state], label=state)
+                    traces.append(go.Bar(
+                        x=x_values,
+                        y=data[state],
+                        name=state,
+                        marker_color=state_to_color[state]
+                    ))
                 elif style == "fill":
-                    ax.fill_between(
-                        range(len(bottom)),
-                        bottom,
-                        [x + y for x, y in zip(bottom, data[state], strict=True)],
-                        color=state_to_color[state],
-                        label=state,
-                    )
-                bottom = [x + y for x, y in zip(bottom, data[state], strict=True)]
-
-        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-
-        ax.set_xlabel(f"{interval} ago", fontsize=18)
-        ax.set_xlim([-0.5, num_intervals - 0.5])
-        ax.set_ylabel(f"number of {coll}", fontsize=18)
-        ax.tick_params(labelsize=14)
-        ax.legend(fontsize=13)
-        fig.tight_layout()
+                    traces.append(go.Scatter(
+                        x=x_values,
+                        y=data[state],
+                        name=state,
+                        fill='tonexty',
+                        mode='lines',
+                        line=dict(width=0.5, color=state_to_color[state]),
+                        fillcolor=state_to_color[state],
+                        stackgroup='one'
+                    ))
+        
+        fig = go.Figure(data=traces)
+        
+        fig.update_layout(
+            barmode='stack' if style == "bar" else None,
+            xaxis=dict(
+                title=dict(text=f"{interval} ago", font=dict(size=18)),
+                range=[-0.5, num_intervals - 0.5],
+                tickfont=dict(size=14),
+                dtick=1
+            ),
+            yaxis=dict(
+                title=dict(text=f"number of {coll}", font=dict(size=18)),
+                tickfont=dict(size=14),
+                dtick=1 if max(sum(data[state]) for state in states if any(data[state])) < 10 else None
+            ),
+            legend=dict(font=dict(size=13)),
+            template='plotly_white'
+        )
+        
         return fig
 
     @staticmethod
